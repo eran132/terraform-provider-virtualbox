@@ -43,34 +43,15 @@ func (p *FrameworkProvider) Metadata(_ context.Context, _ provider.MetadataReque
 }
 
 // Schema defines the provider-level configuration.
+// Must match the SDK provider schema exactly for mux compatibility.
 func (p *FrameworkProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Terraform provider for Oracle VirtualBox",
-		Attributes: map[string]schema.Attribute{
-			"vboxmanage_path": schema.StringAttribute{
-				Description: "Path to the VBoxManage binary. If not set, it will be auto-detected from PATH and common install locations.",
-				Optional:    true,
-			},
-		},
-	}
+	resp.Schema = schema.Schema{}
 }
 
 // Configure prepares the provider for data source and resource operations.
-func (p *FrameworkProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data FrameworkProviderModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// The VBoxManage path (if set) could be passed to resources/data sources
-	// via resp.ResourceData and resp.DataSourceData.
-	// For now, resources use auto-detection. This will be used when resources
-	// are migrated from SDK to framework.
-	if !data.VBoxManagePath.IsNull() {
-		resp.ResourceData = data.VBoxManagePath.ValueString()
-		resp.DataSourceData = data.VBoxManagePath.ValueString()
-	}
+func (p *FrameworkProvider) Configure(_ context.Context, _ provider.ConfigureRequest, _ *provider.ConfigureResponse) {
+	// No provider-level configuration needed currently.
+	// VBoxManage path will be added when both providers share the same schema.
 }
 
 // Resources defines the resources implemented by this provider.

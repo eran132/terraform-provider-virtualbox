@@ -40,7 +40,9 @@ func powerOnAndWait(ctx context.Context, d *schema.ResourceData, vm *vbox.Machin
 	return nil
 }
 
-// Wait until VM is ready, and 'ready' means the first non NAT NIC get a ipv4_address assigned
+// Wait until VM is ready, and 'ready' means the first non NAT NIC get a ipv4_address assigned.
+// If the timeout is reached, the VM is still considered created — the IP may be assigned later
+// (e.g. when DHCP is configured or a static IP is set via provisioning).
 func waitUntilVMIsReady(ctx context.Context, d *schema.ResourceData, vm *vbox.Machine, meta any) error {
 	for i, nic := range vm.NICs {
 		if nic.Network == vbox.NICNetNAT {
@@ -58,7 +60,11 @@ func waitUntilVMIsReady(ctx context.Context, d *schema.ResourceData, vm *vbox.Ma
 			30*time.Second,
 			1*time.Second,
 		); err != nil {
-			return fmt.Errorf("waiting for VM (%s) to become ready: %w", d.Get("name"), err)
+			// Timeout is not fatal — VM is running, just no IP yet
+			tflog.Warn(ctx, "timeout waiting for IP on non-NAT adapter, VM is running but may need DHCP or static IP configuration", map[string]any{
+				"vm":      d.Get("name"),
+				"adapter": i,
+			})
 		}
 		break
 	}
