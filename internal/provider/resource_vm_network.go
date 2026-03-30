@@ -26,7 +26,7 @@ func netTfToVbox(ctx context.Context, d *schema.ResourceData) ([]vbox.NIC, error
 		case "generic":
 			return vbox.NICNetGeneric, nil
 		default:
-			return "", fmt.Errorf("Invalid virtual network adapter type: %s", attr)
+			return "", fmt.Errorf("invalid virtual network adapter type: %s", attr)
 		}
 	}
 
@@ -45,7 +45,7 @@ func netTfToVbox(ctx context.Context, d *schema.ResourceData) ([]vbox.NIC, error
 		case "VirtIO":
 			return vbox.VirtIO, nil
 		default:
-			return "", fmt.Errorf("Invalid virtual network device: %s", attr)
+			return "", fmt.Errorf("invalid virtual network device: %s", attr)
 		}
 	}
 
