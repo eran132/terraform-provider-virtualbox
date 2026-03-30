@@ -1,3 +1,5 @@
+version: "2"
+
 linters:
   enable:
     - errcheck
@@ -10,6 +12,3 @@ linters:
 linters-settings:
   errcheck:
     check-type-assertions: true
-
-issues:
-  exclude-use-default: false
