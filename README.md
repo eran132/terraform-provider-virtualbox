@@ -16,24 +16,35 @@ Published documentation is located on the [Terraform Registry](https://registry.
 terraform {
   required_providers {
     virtualbox = {
-      source = "terra-farm/virtualbox"
-      version = "<latest-tag>"
+      source  = "eran132/virtualbox"
+      version = "~> 1.0"
     }
   }
 }
 
-provider "virtualbox" {
-  # Configuration options
-}
+resource "virtualbox_vm" "basic" {
+  name   = "basic-vm"
+  image  = "https://app.vagrantup.com/ubuntu/boxes/bionic64/versions/20180903.0.0/providers/virtualbox.box"
+  cpus   = 2
+  memory = "1024mib"
 
-resource "virtualbox_vm" "vm" {
-  // ...
+  network_adapter {
+    type = "nat"
+  }
 }
 ```
 
-## Example
+## Examples
 
-You can find a practical example in the [`/examples` directory](/examples)
+The [`/examples`](/examples) directory contains ready-to-use configurations:
+
+| Example | Description |
+|---------|-------------|
+| [basic](examples/basic/) | Simple VM with NAT networking |
+| [port-forwarding](examples/port-forwarding/) | NAT with SSH and HTTP port forwarding |
+| [multi-disk](examples/multi-disk/) | VM with additional NVMe data disk |
+| [windows-vm](examples/windows-vm/) | Windows 11 VM with EFI and GUI |
+| [complete](examples/complete/) | All features: networks, disks, snapshots, shared folders |
 
 If you want to contribute documentation changes, see the [Contribution guide](CONTRIBUTING.md).
 

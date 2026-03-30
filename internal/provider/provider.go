@@ -1,8 +1,4 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-// Package virtualbox serves as an entrypoint, returning the list of available
+// Package provider serves as an entrypoint, returning the list of available
 // resources for the plugin.
 package provider
 
@@ -27,7 +23,16 @@ func init() {
 func New() *schema.Provider {
 	return &schema.Provider{
 		ResourcesMap: map[string]*schema.Resource{
-			"virtualbox_vm": resourceVM(),
+			"virtualbox_vm":               resourceVM(),
+			"virtualbox_disk":             resourceDisk(),
+			"virtualbox_snapshot":         resourceSnapshot(),
+			"virtualbox_hostonly_network": resourceHostonlyNetwork(),
+			"virtualbox_nat_network":      resourceNATNetwork(),
+		},
+		DataSourcesMap: map[string]*schema.Resource{
+			"virtualbox_host_info": dataSourceHostInfo(),
+			"virtualbox_vm":       dataSourceVM(),
+			"virtualbox_network":  dataSourceNetwork(),
 		},
 		ConfigureContextFunc: configure,
 	}
