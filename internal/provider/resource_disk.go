@@ -111,7 +111,8 @@ func resourceDiskRead(ctx context.Context, d *schema.ResourceData, meta any) dia
 		return nil
 	}
 
-	if info.accessible != "yes" {
+	// Disk is inaccessible if explicitly marked so (not present means it's fine)
+	if info.accessible == "no" {
 		d.SetId("")
 		return nil
 	}
@@ -154,7 +155,11 @@ func resourceDiskDelete(ctx context.Context, d *schema.ResourceData, meta any) d
 
 	_, _, err := vbox.Run(ctx, "closemedium", "disk", filePath, "--delete")
 	if err != nil {
-		return diag.Errorf("failed to delete disk %s: %v", filePath, err)
+		// If the file is already gone (e.g. VM delete cleaned it up), that's fine
+		errStr := fmt.Sprintf("%v", err)
+		if !strings.Contains(errStr, "VERR_FILE_NOT_FOUND") && !strings.Contains(errStr, "not found") {
+			return diag.Errorf("failed to delete disk %s: %v", filePath, err)
+		}
 	}
 
 	d.SetId("")
@@ -199,12 +204,15 @@ func showMediumInfo(ctx context.Context, filePath string) (*diskMediumInfo, erro
 	info.format = props["Storage format"]
 	info.accessible = props["Accessible"]
 
-	// Parse logical size: "10240 MBytes"
-	if sizeStr, ok := props["Logical size"]; ok {
-		sizeStr = strings.TrimSuffix(sizeStr, " MBytes")
-		sizeStr = strings.TrimSpace(sizeStr)
-		if size, err := strconv.Atoi(sizeStr); err == nil {
-			info.sizeMB = size
+	// Parse size — may be "Capacity" or "Logical size" depending on VBox version
+	for _, sizeKey := range []string{"Capacity", "Logical size"} {
+		if sizeStr, ok := props[sizeKey]; ok {
+			sizeStr = strings.TrimSuffix(sizeStr, " MBytes")
+			sizeStr = strings.TrimSpace(sizeStr)
+			if size, err := strconv.Atoi(sizeStr); err == nil {
+				info.sizeMB = size
+				break
+			}
 		}
 	}
 

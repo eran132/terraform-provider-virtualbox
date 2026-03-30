@@ -449,9 +449,9 @@ func resourceVMUpdate(ctx context.Context, d *schema.ResourceData, meta any) dia
 		return diag.Errorf("unable to get machine %s: %v", d.Id(), err)
 	}
 
-	if err := vm.Poweroff(); err != nil {
-		return diag.Errorf("unable to poweroff machine %s: %v", d.Id(), err)
-	}
+	// Power off via VBoxManage for reliability
+	vbox.Run(ctx, "controlvm", d.Id(), "poweroff") //nolint:errcheck
+	time.Sleep(3 * time.Second)
 
 	// Modify VM
 	if err := tfToVbox(ctx, d, vm); err != nil {
