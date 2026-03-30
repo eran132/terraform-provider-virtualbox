@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	humanize "github.com/dustin/go-humanize"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -402,7 +403,7 @@ func resourceVMRead(ctx context.Context, d *schema.ResourceData, meta any) diag.
 	}
 	bytes := uint64(vm.Memory) * humanize.MiByte
 	repr := humanize.IBytes(bytes)
-	err = d.Set("memory", strings.ToLower(repr))
+	err = d.Set("memory", strings.ToLower(strings.ReplaceAll(repr, " ", "")))
 	if err != nil {
 		return diag.Errorf("can't set memory: %v", err)
 	}
@@ -539,11 +540,14 @@ func resourceVMUpdate(ctx context.Context, d *schema.ResourceData, meta any) dia
 }
 
 func resourceVMDelete(d *schema.ResourceData, meta any) error {
-	vm, err := vbox.GetMachine(d.Id())
-	if err != nil {
-		return fmt.Errorf("unable to get machine for deletion: %w", err)
-	}
-	if err := vm.Delete(); err != nil {
+	vmID := d.Id()
+
+	// Power off the VM first (ignore errors — it may already be off)
+	vbox.Run(context.Background(), "controlvm", vmID, "poweroff") //nolint:errcheck
+	time.Sleep(3 * time.Second)
+
+	// Unregister and delete all files
+	if _, _, err := vbox.Run(context.Background(), "unregistervm", vmID, "--delete"); err != nil {
 		return fmt.Errorf("unable to remove the VM: %w", err)
 	}
 	return nil

@@ -235,10 +235,32 @@ func netVboxToTf(vm *vbox.Machine, d *schema.ResourceData) error {
 	if vm.State == vbox.Running {
 		nicCount, err := countRuntimeNICs(vm)
 		if err != nil {
-			return err
+			// Guest Additions not installed or not ready — skip guest property collection
+			// and fall through to the non-running path which sets defaults
+			nicCount = 0
 		}
 
 		if nicCount < len(vm.NICs) {
+			// Not enough guest info available — use config-only data
+			nics := make([]map[string]any, 0, len(vm.NICs))
+			for _, nic := range vm.NICs {
+				out := make(map[string]any)
+				out["type"] = vboxToTfNetworkType(nic.Network)
+				out["device"] = vboxToTfVdevice(nic.Hardware)
+				out["host_interface"] = nic.HostInterface
+				out["mac_address"] = nic.MacAddr
+				out["cable_connected"] = true
+				out["promiscuous_mode"] = "deny"
+				out["nat_dns_host_resolver"] = false
+				out["nat_dns_proxy"] = false
+				out["status"] = "unknown"
+				out["ipv4_address"] = ""
+				out["ipv4_address_available"] = "no"
+				nics = append(nics, out)
+			}
+			if err := d.Set("network_adapter", nics); err != nil {
+				return fmt.Errorf("can't set network_adapter: %w", err)
+			}
 			return nil
 		}
 
@@ -303,6 +325,10 @@ func netVboxToTf(vm *vbox.Machine, d *schema.ResourceData) error {
 			out["device"] = vboxToTfVdevice(nic.Hardware)
 			out["host_interface"] = nic.HostInterface
 			out["mac_address"] = nic.MacAddr
+			out["cable_connected"] = true
+			out["promiscuous_mode"] = "deny"
+			out["nat_dns_host_resolver"] = false
+			out["nat_dns_proxy"] = false
 
 			osNic, ok := osNicMap[nic.MacAddr]
 			if !ok {
@@ -335,6 +361,10 @@ func netVboxToTf(vm *vbox.Machine, d *schema.ResourceData) error {
 			out["device"] = vboxToTfVdevice(nic.Hardware)
 			out["host_interface"] = nic.HostInterface
 			out["mac_address"] = nic.MacAddr
+			out["cable_connected"] = true
+			out["promiscuous_mode"] = "deny"
+			out["nat_dns_host_resolver"] = false
+			out["nat_dns_proxy"] = false
 
 			out["status"] = "down"
 			out["ipv4_address"] = ""

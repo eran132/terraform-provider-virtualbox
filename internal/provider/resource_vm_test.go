@@ -74,6 +74,7 @@ resource "virtualbox_vm" "test" {
   image  = "https://app.vagrantup.com/ubuntu/boxes/bionic64/versions/20180903.0.0/providers/virtualbox.box"
   cpus   = 1
   memory = "256mib"
+  gui    = true
 
   network_adapter {
     type = "nat"
@@ -89,6 +90,7 @@ resource "virtualbox_vm" "test" {
   image  = "https://app.vagrantup.com/ubuntu/boxes/bionic64/versions/20180903.0.0/providers/virtualbox.box"
   cpus   = 2
   memory = "512mib"
+  gui    = true
 
   network_adapter {
     type = "nat"
