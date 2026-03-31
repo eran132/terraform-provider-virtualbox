@@ -93,14 +93,17 @@ func unpackImage(ctx context.Context, imagePath, toDir string) error {
 	return fmt.Errorf("error unpacking gold image %s: all tar extraction methods failed", imagePath)
 }
 
-// toTarPath converts a Windows path to a POSIX path for tar.
-// C:\Users\... -> /c/Users/... (Git Bash tar can't handle C: drive letters)
+// toTarPath converts a Windows path for tar compatibility.
+// Under MSYS/Git Bash: C:\Users\... -> /c/Users/... (Git Bash tar needs POSIX paths)
+// Under native Windows: C:\Users\... -> C:/Users/... (Windows tar needs forward slashes only)
 func toTarPath(p string) string {
 	p = strings.ReplaceAll(p, "\\", "/")
-	if len(p) >= 2 && p[1] == ':' {
-		// C:/... -> /c/...
-		drive := strings.ToLower(string(p[0]))
-		p = "/" + drive + p[2:]
+	// Only convert drive letters to /x/ format when running under MSYS (Git Bash)
+	if os.Getenv("MSYSTEM") != "" || os.Getenv("MINGW_PREFIX") != "" {
+		if len(p) >= 2 && p[1] == ':' {
+			drive := strings.ToLower(string(p[0]))
+			p = "/" + drive + p[2:]
+		}
 	}
 	return p
 }

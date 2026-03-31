@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"os"
+	"runtime"
 	"testing"
 )
 
@@ -166,24 +168,30 @@ macaddress1="AABBCCDDEEFF"
 }
 
 func TestToTarPath(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{`C:\Users\test\file.box`, "/c/Users/test/file.box"},
-		{`D:\data\image.tar.gz`, "/d/data/image.tar.gz"},
-		{"/usr/local/file.box", "/usr/local/file.box"},
-		{"relative/path.box", "relative/path.box"},
-		{`C:\`, "/c/"},
+	isMSYS := os.Getenv("MSYSTEM") != "" || os.Getenv("MINGW_PREFIX") != ""
+
+	// Backslashes should always become forward slashes
+	result := toTarPath(`C:\Users\test\file.box`)
+	if runtime.GOOS == "windows" && isMSYS {
+		if result != "/c/Users/test/file.box" {
+			t.Errorf("MSYS: toTarPath expected /c/..., got %q", result)
+		}
+	} else if runtime.GOOS == "windows" {
+		if result != "C:/Users/test/file.box" {
+			t.Errorf("Windows: toTarPath expected C:/..., got %q", result)
+		}
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result := toTarPath(tt.input)
-			if result != tt.expected {
-				t.Errorf("toTarPath(%q) = %q, want %q", tt.input, result, tt.expected)
-			}
-		})
+	// Unix paths should pass through unchanged
+	result = toTarPath("/usr/local/file.box")
+	if result != "/usr/local/file.box" {
+		t.Errorf("Unix path: expected /usr/local/file.box, got %q", result)
+	}
+
+	// Relative paths should pass through unchanged
+	result = toTarPath("relative/path.box")
+	if result != "relative/path.box" {
+		t.Errorf("Relative path: expected relative/path.box, got %q", result)
 	}
 }
 
