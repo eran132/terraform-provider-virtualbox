@@ -17,16 +17,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 func resourceVMExists(d *schema.ResourceData, meta any) (bool, error) {
 	name := d.Get("name").(string)
 
-	switch _, err := vbox.GetMachine(name); err {
+	switch _, err := getMachine(name); err {
 	case nil:
 		return true, nil
-	case vbox.ErrMachineNotExist:
+	case ErrMachineNotExist:
 		return false, nil
 	default:
 		return false, fmt.Errorf("error when checking for existence of the VM: %w", err)
@@ -45,12 +44,12 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 
 		// Clone the VM
 		args := []string{"clonevm", sourceVM, "--name", name, "--options", "link", "--register"}
-		if _, _, err := vbox.Run(ctx, args...); err != nil {
+		if _, _, err := vboxRun(ctx, args...); err != nil {
 			return diag.Errorf("failed to create linked clone: %v", err)
 		}
 
 		// Get the cloned VM
-		vm, err := vbox.GetMachine(name)
+		vm, err := getMachine(name)
 		if err != nil {
 			return diag.Errorf("failed to get cloned VM: %v", err)
 		}
@@ -59,7 +58,7 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 		if err := tfToVbox(ctx, d, vm); err != nil {
 			return diag.Errorf("unable to convert Terraform data to VM properties: %v", err)
 		}
-		if err := vm.Modify(); err != nil {
+		if err := modifyVM(ctx, vm); err != nil {
 			return diag.Errorf("can't set up VM properties: %v", err)
 		}
 
@@ -163,7 +162,7 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 
 	// Create VM instance
 	name := d.Get("name").(string)
-	vm, err := vbox.CreateMachine(name, machineFolder)
+	vm, err := createMachine(ctx, name, machineFolder)
 	if err != nil {
 		return diag.Errorf("can't create virtualbox VM %s: %v", name, err)
 	}
@@ -174,12 +173,12 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 
 		target := filepath.Join(vm.BaseFolder, filename)
 
-		if _, _, err := vbox.Run(ctx, "internalcommands", "sethduuid", src); err != nil {
+		if _, _, err := vboxRun(ctx, "internalcommands", "sethduuid", src); err != nil {
 			return diag.Errorf("unable to set UUID: %v", err)
 		}
 
 		imageOpMutex.Lock() // Sequentialize image cloning to improve disk performance
-		err := vbox.CloneHD(src, target)
+		err := cloneHD(ctx, src, target)
 		imageOpMutex.Unlock()
 		if err != nil {
 			return diag.Errorf("failed to clone *.vdi and *.vmdk to VM folder: %v", err)
@@ -192,23 +191,12 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 		return diag.Errorf("unable to gather disks: %v", err)
 	}
 
-	if err := vm.AddStorageCtl("SATA", vbox.StorageController{
-		SysBus:      vbox.SysBusSATA,
-		Ports:       uint(len(vmDisks)) + 1,
-		Chipset:     vbox.CtrlIntelAHCI,
-		HostIOCache: true,
-		Bootable:    true,
-	}); err != nil {
+	if err := addStorageCtl(ctx, vm.UUID, "SATA", "sata", "IntelAHCI", len(vmDisks)+1, true, true); err != nil {
 		return diag.Errorf("can't create VirtualBox storage controller: %v", err)
 	}
 
 	for i, disk := range vmDisks {
-		if err := vm.AttachStorage("SATA", vbox.StorageMedium{
-			Port:      uint(i),
-			Device:    0,
-			DriveType: vbox.DriveHDD,
-			Medium:    disk,
-		}); err != nil {
+		if err := attachStorage(ctx, vm.UUID, "SATA", i, 0, "hdd", disk); err != nil {
 			return diag.Errorf("failed to attach VirtualBox storage medium: %v", err)
 		}
 	}
@@ -259,12 +247,7 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 			return diag.Errorf("close target optical disk image: %v", err)
 		}
 
-		if err := vm.AttachStorage("SATA", vbox.StorageMedium{
-			Port:      uint(len(vmDisks) + i),
-			Device:    0,
-			DriveType: vbox.DriveDVD,
-			Medium:    target,
-		}); err != nil {
+		if err := attachStorage(ctx, vm.UUID, "SATA", len(vmDisks)+i, 0, "dvddrive", target); err != nil {
 			return diag.Errorf("unable to attach VirtualBox storage medium: %v", err)
 		}
 	}
@@ -295,7 +278,7 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 			args = append(args, "--bootable", "off")
 		}
 
-		if _, _, err := vbox.Run(ctx, args...); err != nil {
+		if _, _, err := vboxRun(ctx, args...); err != nil {
 			return diag.Errorf("failed to add storage controller %s: %v", ctlName, err)
 		}
 	}
@@ -325,7 +308,7 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 			args = append(args, "--hotpluggable", "on")
 		}
 
-		if _, _, err := vbox.Run(ctx, args...); err != nil {
+		if _, _, err := vboxRun(ctx, args...); err != nil {
 			return diag.Errorf("failed to attach disk to %s port %d: %v", ctlName, port, err)
 		}
 	}
@@ -334,18 +317,18 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 	if err := tfToVbox(ctx, d, vm); err != nil {
 		return diag.Errorf("unable to convert Terraform data to VM properties: %v", err)
 	}
-	if err := vm.Modify(); err != nil {
+	if err := modifyVM(ctx, vm); err != nil {
 		return diag.Errorf("can't set up VM properties: %v", err)
 	}
 
-	// Apply firmware setting (not exposed by go-virtualbox)
+	// Apply firmware setting
 	if firmware := d.Get("firmware").(string); firmware != "bios" {
 		if err := applyFirmware(ctx, vm.UUID, firmware); err != nil {
 			return diag.Errorf("unable to set firmware: %v", err)
 		}
 	}
 
-	// Apply graphics controller (not exposed by go-virtualbox)
+	// Apply graphics controller
 	if gc := d.Get("graphics_controller").(string); gc != "" {
 		if err := applyGraphicsController(ctx, vm.UUID, gc); err != nil {
 			return diag.Errorf("unable to set graphics controller: %v", err)
@@ -433,18 +416,18 @@ func resourceVMCreate(ctx context.Context, d *schema.ResourceData, meta any) dia
 	return resourceVMRead(ctx, d, meta)
 }
 
-func setState(d *schema.ResourceData, state vbox.MachineState) error {
+func setState(d *schema.ResourceData, state MachineState) error {
 	var err error
 	switch state {
-	case vbox.Poweroff:
+	case MachineStatePoweroff:
 		err = d.Set("status", "poweroff")
-	case vbox.Running:
+	case MachineStateRunning:
 		err = d.Set("status", "running")
-	case vbox.Paused:
+	case MachineStatePaused:
 		err = d.Set("status", "paused")
-	case vbox.Saved:
+	case MachineStateSaved:
 		err = d.Set("status", "saved")
-	case vbox.Aborted:
+	case MachineStateAborted:
 		err = d.Set("status", "aborted")
 	}
 	if err != nil {
@@ -454,11 +437,11 @@ func setState(d *schema.ResourceData, state vbox.MachineState) error {
 }
 
 func resourceVMRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	vm, err := vbox.GetMachine(d.Id())
+	vm, err := getMachine(d.Id())
 	switch err {
 	case nil:
 		break
-	case vbox.ErrMachineNotExist:
+	case ErrMachineNotExist:
 		// VM no longer exists.
 		d.SetId("")
 		return nil
@@ -496,7 +479,7 @@ func resourceVMRead(ctx context.Context, d *schema.ResourceData, meta any) diag.
 
 	/* Set connection info to first non NAT IPv4 address */
 	for i, nic := range vm.NICs {
-		if nic.Network == vbox.NICNetNAT {
+		if nic.Network == NICNetNAT {
 			continue
 		}
 		availKey := fmt.Sprintf("network_adapter.%d.ipv4_address_available", i)
@@ -526,20 +509,20 @@ func resourceVMRead(ctx context.Context, d *schema.ResourceData, meta any) diag.
 func resourceVMUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	// TODO: allow partial updates
 
-	vm, err := vbox.GetMachine(d.Id())
+	vm, err := getMachine(d.Id())
 	if err != nil {
 		return diag.Errorf("unable to get machine %s: %v", d.Id(), err)
 	}
 
 	// Power off via VBoxManage for reliability
-	vbox.Run(ctx, "controlvm", d.Id(), "poweroff") //nolint:errcheck
+	vboxRun(ctx, "controlvm", d.Id(), "poweroff") //nolint:errcheck
 	time.Sleep(3 * time.Second)
 
 	// Modify VM
 	if err := tfToVbox(ctx, d, vm); err != nil {
 		return diag.Errorf("can't convert terraform config to virtual machine: %v", err)
 	}
-	if err := vm.Modify(); err != nil {
+	if err := modifyVM(ctx, vm); err != nil {
 		return diag.Errorf("unable to modify the vm: %v", err)
 	}
 
@@ -632,11 +615,11 @@ func resourceVMDelete(d *schema.ResourceData, meta any) error {
 	vmID := d.Id()
 
 	// Power off the VM first (ignore errors — it may already be off)
-	vbox.Run(context.Background(), "controlvm", vmID, "poweroff") //nolint:errcheck
+	vboxRun(context.Background(), "controlvm", vmID, "poweroff") //nolint:errcheck
 	time.Sleep(3 * time.Second)
 
 	// Unregister and delete all files
-	if _, _, err := vbox.Run(context.Background(), "unregistervm", vmID, "--delete"); err != nil {
+	if _, _, err := vboxRun(context.Background(), "unregistervm", vmID, "--delete"); err != nil {
 		return fmt.Errorf("unable to remove the VM: %w", err)
 	}
 	return nil

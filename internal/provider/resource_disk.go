@@ -8,7 +8,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 func resourceDisk() *schema.Resource {
@@ -79,7 +78,7 @@ func resourceDiskCreate(ctx context.Context, d *schema.ResourceData, meta any) d
 	variant := d.Get("variant").(string)
 
 	// Create the medium
-	_, _, err := vbox.Run(ctx, "createmedium", "disk",
+	_, _, err := vboxRun(ctx, "createmedium", "disk",
 		"--filename", filePath,
 		"--size", strconv.Itoa(size),
 		"--format", format,
@@ -144,7 +143,7 @@ func resourceDiskUpdate(ctx context.Context, d *schema.ResourceData, meta any) d
 	if d.HasChange("size") {
 		newSize := d.Get("size").(int)
 
-		_, _, err := vbox.Run(ctx, "modifymedium", "disk", filePath, "--resize", strconv.Itoa(newSize))
+		_, _, err := vboxRun(ctx, "modifymedium", "disk", filePath, "--resize", strconv.Itoa(newSize))
 		if err != nil {
 			return diag.Errorf("failed to resize disk %s: %v", filePath, err)
 		}
@@ -156,7 +155,7 @@ func resourceDiskUpdate(ctx context.Context, d *schema.ResourceData, meta any) d
 func resourceDiskDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	filePath := d.Get("file_path").(string)
 
-	_, _, err := vbox.Run(ctx, "closemedium", "disk", filePath, "--delete")
+	_, _, err := vboxRun(ctx, "closemedium", "disk", filePath, "--delete")
 	if err != nil {
 		// If the file is already gone (e.g. VM delete cleaned it up), that's fine
 		errStr := fmt.Sprintf("%v", err)
@@ -202,7 +201,7 @@ type diskMediumInfo struct {
 
 // showMediumInfo runs VBoxManage showmediuminfo and parses the key-value output.
 func showMediumInfo(ctx context.Context, filePath string) (*diskMediumInfo, error) {
-	stdout, _, err := vbox.Run(ctx, "showmediuminfo", "disk", filePath)
+	stdout, _, err := vboxRun(ctx, "showmediuminfo", "disk", filePath)
 	if err != nil {
 		return nil, fmt.Errorf("showmediuminfo disk %s: %w", filePath, err)
 	}

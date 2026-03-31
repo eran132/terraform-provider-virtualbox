@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 // applySharedFolders configures shared folders on the VM.
@@ -32,7 +31,7 @@ func applySharedFolders(ctx context.Context, vmUUID string, d *schema.ResourceDa
 			args = append(args, "--auto-mount-point", mountPoint)
 		}
 
-		if _, _, err := vbox.Run(ctx, args...); err != nil {
+		if _, _, err := vboxRun(ctx, args...); err != nil {
 			return fmt.Errorf("failed to add shared folder %q: %w", name, err)
 		}
 	}
@@ -46,7 +45,7 @@ func removeSharedFolders(ctx context.Context, vmUUID string, d *schema.ResourceD
 		prefix := fmt.Sprintf("shared_folder.%d.", i)
 		name := d.Get(prefix + "name").(string)
 		// Ignore errors since folder may not exist
-		vbox.Run(ctx, "sharedfolder", "remove", vmUUID, "--name", name) //nolint:errcheck
+		vboxRun(ctx, "sharedfolder", "remove", vmUUID, "--name", name) //nolint:errcheck
 	}
 	return nil
 }
@@ -56,7 +55,7 @@ func applyCPUExecutionCap(ctx context.Context, vmUUID string, cap int) error {
 	if cap >= 100 {
 		return nil // 100% is default, no action needed
 	}
-	_, _, err := vbox.Run(ctx, "modifyvm", vmUUID, "--cpuexecutioncap", fmt.Sprintf("%d", cap))
+	_, _, err := vboxRun(ctx, "modifyvm", vmUUID, "--cpuexecutioncap", fmt.Sprintf("%d", cap))
 	if err != nil {
 		return fmt.Errorf("failed to set CPU execution cap to %d%%: %w", cap, err)
 	}
@@ -69,7 +68,7 @@ func applyNestedHWVirt(ctx context.Context, vmUUID string, enabled bool) error {
 	if enabled {
 		val = "on"
 	}
-	_, _, err := vbox.Run(ctx, "modifyvm", vmUUID, "--nested-hw-virt", val)
+	_, _, err := vboxRun(ctx, "modifyvm", vmUUID, "--nested-hw-virt", val)
 	if err != nil {
 		return fmt.Errorf("failed to set nested HW virtualization: %w", err)
 	}

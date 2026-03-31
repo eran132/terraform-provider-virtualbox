@@ -14,21 +14,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 // startVM starts the VM respecting the gui attribute. When gui is true,
 // VBoxManage startvm is called with --type gui; otherwise headless.
-func startVM(ctx context.Context, d *schema.ResourceData, vm *vbox.Machine) error {
+func startVM(ctx context.Context, d *schema.ResourceData, vm *Machine) error {
 	gui := d.Get("gui").(bool)
 	if gui {
-		_, _, err := vbox.Run(ctx, "startvm", vm.UUID, "--type", "gui")
-		return err
+		return startVMGUI(ctx, vm.UUID)
 	}
-	return vm.Start()
+	return startVMHeadless(ctx, vm.UUID)
 }
 
-func powerOnAndWait(ctx context.Context, d *schema.ResourceData, vm *vbox.Machine, meta any) error {
+func powerOnAndWait(ctx context.Context, d *schema.ResourceData, vm *Machine, meta any) error {
 	if err := startVM(ctx, d, vm); err != nil {
 		return fmt.Errorf("can't start vm: %w", err)
 	}
@@ -43,9 +41,9 @@ func powerOnAndWait(ctx context.Context, d *schema.ResourceData, vm *vbox.Machin
 // Wait until VM is ready, and 'ready' means the first non NAT NIC get a ipv4_address assigned.
 // If the timeout is reached, the VM is still considered created — the IP may be assigned later
 // (e.g. when DHCP is configured or a static IP is set via provisioning).
-func waitUntilVMIsReady(ctx context.Context, d *schema.ResourceData, vm *vbox.Machine, meta any) error {
+func waitUntilVMIsReady(ctx context.Context, d *schema.ResourceData, vm *Machine, meta any) error {
 	for i, nic := range vm.NICs {
-		if nic.Network == vbox.NICNetNAT {
+		if nic.Network == NICNetNAT {
 			continue
 		}
 
@@ -71,7 +69,7 @@ func waitUntilVMIsReady(ctx context.Context, d *schema.ResourceData, vm *vbox.Ma
 	return nil
 }
 
-func tfToVbox(ctx context.Context, d *schema.ResourceData, vm *vbox.Machine) error {
+func tfToVbox(ctx context.Context, d *schema.ResourceData, vm *Machine) error {
 	var err error
 
 	vm.OSType = d.Get("os_type").(string)
@@ -83,18 +81,18 @@ func tfToVbox(ctx context.Context, d *schema.ResourceData, vm *vbox.Machine) err
 	vm.Memory = uint(bytes / humanize.MiByte) // VirtualBox expect memory to be in MiB units
 
 	vm.VRAM = uint(d.Get("vram").(int))
-	vm.Flag = vbox.ACPI | vbox.RTCUSEUTC | vbox.HWVIRTEX | vbox.NESTEDPAGING | vbox.LONGMODE | vbox.VTXUX
+	vm.Flag = FlagACPI | FlagRTCUSEUTC | FlagHWVIRTEX | FlagNESTEDPAGING | FlagLONGMODE | FlagVTXUX
 	if d.Get("ioapic").(bool) {
-		vm.Flag |= vbox.IOAPIC
+		vm.Flag |= FlagIOAPIC
 	}
 	if d.Get("pae").(bool) {
-		vm.Flag |= vbox.PAE
+		vm.Flag |= FlagPAE
 	}
 	if d.Get("largepages").(bool) {
-		vm.Flag |= vbox.LARGEPAGES
+		vm.Flag |= FlagLARGEPAGES
 	}
 	if d.Get("vtx_vpid").(bool) {
-		vm.Flag |= vbox.VTXVPID
+		vm.Flag |= FlagVTXVPID
 	}
 	vm.NICs, err = netTfToVbox(ctx, d)
 	vm.BootOrder = defaultBootOrder
@@ -138,7 +136,7 @@ func newVMStateRefreshFunc(ctx context.Context, d *schema.ResourceData, attribut
 		// See if we can access our attribute
 		if attr, ok := d.GetOk(attribute); ok {
 			// Retrieve the VM properties
-			vm, err := vbox.GetMachine(d.Id())
+			vm, err := getMachine(d.Id())
 			if err != nil {
 				return nil, "", fmt.Errorf("unable to retrieve vm: %w", err)
 			}

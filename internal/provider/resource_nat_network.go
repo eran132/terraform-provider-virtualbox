@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 func resourceNATNetwork() *schema.Resource {
@@ -133,7 +132,7 @@ func resourceNATNetworkCreate(ctx context.Context, d *schema.ResourceData, meta 
 		args = append(args, "--ipv6", "on")
 	}
 
-	if _, _, err := vbox.Run(ctx, args...); err != nil {
+	if _, _, err := vboxRun(ctx, args...); err != nil {
 		return diag.Errorf("failed to create NAT network %q: %v", name, err)
 	}
 
@@ -152,7 +151,7 @@ func resourceNATNetworkRead(ctx context.Context, d *schema.ResourceData, meta an
 
 	tflog.Debug(ctx, "reading NAT network", map[string]any{"name": name})
 
-	stdout, _, err := vbox.Run(ctx, "natnetwork", "list", name)
+	stdout, _, err := vboxRun(ctx, "natnetwork", "list", name)
 	if err != nil {
 		// If the network no longer exists, remove from state.
 		if strings.Contains(stdout, "does not exist") || strings.Contains(fmt.Sprintf("%v", err), "does not exist") {
@@ -199,7 +198,7 @@ func resourceNATNetworkUpdate(ctx context.Context, d *schema.ResourceData, meta 
 
 	// Only run modify if we have changes beyond the base args
 	if len(args) > 4 {
-		if _, _, err := vbox.Run(ctx, args...); err != nil {
+		if _, _, err := vboxRun(ctx, args...); err != nil {
 			return diag.Errorf("failed to modify NAT network %q: %v", name, err)
 		}
 	}
@@ -213,7 +212,7 @@ func resourceNATNetworkUpdate(ctx context.Context, d *schema.ResourceData, meta 
 		for _, r := range oldRules {
 			rule := r.(map[string]any)
 			ruleName := rule["name"].(string)
-			if _, _, err := vbox.Run(ctx, "natnetwork", "modify", "--netname", name, "--port-forward-4", "delete", ruleName); err != nil {
+			if _, _, err := vboxRun(ctx, "natnetwork", "modify", "--netname", name, "--port-forward-4", "delete", ruleName); err != nil {
 				tflog.Warn(ctx, "failed to delete port forwarding rule", map[string]any{
 					"rule":  ruleName,
 					"error": err.Error(),
@@ -235,7 +234,7 @@ func resourceNATNetworkDelete(ctx context.Context, d *schema.ResourceData, meta 
 
 	tflog.Debug(ctx, "deleting NAT network", map[string]any{"name": name})
 
-	if _, _, err := vbox.Run(ctx, "natnetwork", "remove", "--netname", name); err != nil {
+	if _, _, err := vboxRun(ctx, "natnetwork", "remove", "--netname", name); err != nil {
 		return diag.Errorf("failed to delete NAT network %q: %v", name, err)
 	}
 
@@ -261,7 +260,7 @@ func addPortForwardingRules(ctx context.Context, name string, d *schema.Resource
 		ruleStr := fmt.Sprintf("%s:%s:[%s]:%d:[%s]:%d",
 			ruleName, protocol, hostIP, hostPort, guestIP, guestPort)
 
-		if _, _, err := vbox.Run(ctx, "natnetwork", "modify", "--netname", name, "--port-forward-4", ruleStr); err != nil {
+		if _, _, err := vboxRun(ctx, "natnetwork", "modify", "--netname", name, "--port-forward-4", ruleStr); err != nil {
 			return fmt.Errorf("failed to add port forwarding rule %q: %w", ruleName, err)
 		}
 	}

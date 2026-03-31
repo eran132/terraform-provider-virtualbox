@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 func dataSourceNetwork() *schema.Resource {
@@ -89,7 +88,7 @@ func dataSourceNetworkRead(ctx context.Context, d *schema.ResourceData, meta any
 	tflog.Debug(ctx, "reading VirtualBox network info")
 
 	// Host-only interfaces
-	hostOnlyOut, _, err := vbox.Run(ctx, "list", "hostonlyifs")
+	hostOnlyOut, _, err := vboxRun(ctx, "list", "hostonlyifs")
 	if err != nil {
 		tflog.Warn(ctx, "failed to list host-only interfaces", map[string]any{
 			"error": err.Error(),
@@ -102,7 +101,7 @@ func dataSourceNetworkRead(ctx context.Context, d *schema.ResourceData, meta any
 	}
 
 	// NAT networks
-	natOut, _, err := vbox.Run(ctx, "list", "natnets")
+	natOut, _, err := vboxRun(ctx, "list", "natnets")
 	if err != nil {
 		tflog.Warn(ctx, "failed to list NAT networks", map[string]any{
 			"error": err.Error(),
@@ -115,7 +114,7 @@ func dataSourceNetworkRead(ctx context.Context, d *schema.ResourceData, meta any
 	}
 
 	// Bridged interfaces
-	bridgedOut, _, err := vbox.Run(ctx, "list", "bridgedifs")
+	bridgedOut, _, err := vboxRun(ctx, "list", "bridgedifs")
 	if err != nil {
 		tflog.Warn(ctx, "failed to list bridged interfaces", map[string]any{
 			"error": err.Error(),

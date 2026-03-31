@@ -7,7 +7,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 // dangerousCommands lists VBoxManage subcommands that should not be allowed
@@ -55,7 +54,7 @@ func executeCustomizations(ctx context.Context, vmUUID string, customizations []
 			"args":  strings.Join(args, " "),
 		})
 
-		if _, _, err := vbox.Run(ctx, args...); err != nil {
+		if _, _, err := vboxRun(ctx, args...); err != nil {
 			return fmt.Errorf("customize[%d] VBoxManage %s failed: %w", i, strings.Join(args, " "), err)
 		}
 	}
@@ -70,20 +69,19 @@ func applyFirmware(ctx context.Context, vmUUID string, firmware string) error {
 		// "bios" is the VirtualBox default, no action needed unless explicitly changing
 		return nil
 	}
-	_, _, err := vbox.Run(ctx, "modifyvm", vmUUID, "--firmware", firmware)
+	_, _, err := vboxRun(ctx, "modifyvm", vmUUID, "--firmware", firmware)
 	if err != nil {
 		return fmt.Errorf("failed to set firmware to %s: %w", firmware, err)
 	}
 	return nil
 }
 
-// applyGraphicsController sets the graphics controller via VBoxManage modifyvm
-// since go-virtualbox doesn't expose this property.
+// applyGraphicsController sets the graphics controller via VBoxManage modifyvm.
 func applyGraphicsController(ctx context.Context, vmUUID string, controller string) error {
 	if controller == "" {
 		return nil
 	}
-	_, _, err := vbox.Run(ctx, "modifyvm", vmUUID, "--graphicscontroller", controller)
+	_, _, err := vboxRun(ctx, "modifyvm", vmUUID, "--graphicscontroller", controller)
 	if err != nil {
 		return fmt.Errorf("failed to set graphics controller to %s: %w", controller, err)
 	}
@@ -104,7 +102,7 @@ func applyUSBController(ctx context.Context, vmUUID string, controller string) e
 	case "xhci":
 		flag = "--usbxhci"
 	}
-	_, _, err := vbox.Run(ctx, "modifyvm", vmUUID, flag, "on")
+	_, _, err := vboxRun(ctx, "modifyvm", vmUUID, flag, "on")
 	if err != nil {
 		return fmt.Errorf("failed to set USB controller to %s: %w", controller, err)
 	}
@@ -114,12 +112,12 @@ func applyUSBController(ctx context.Context, vmUUID string, controller string) e
 // applyClipboardAndDragDrop sets clipboard and drag-and-drop modes.
 func applyClipboardAndDragDrop(ctx context.Context, vmUUID string, clipboard string, dragDrop string) error {
 	if clipboard != "disabled" {
-		if _, _, err := vbox.Run(ctx, "modifyvm", vmUUID, "--clipboard-mode", clipboard); err != nil {
+		if _, _, err := vboxRun(ctx, "modifyvm", vmUUID, "--clipboard-mode", clipboard); err != nil {
 			return fmt.Errorf("failed to set clipboard mode: %w", err)
 		}
 	}
 	if dragDrop != "disabled" {
-		if _, _, err := vbox.Run(ctx, "modifyvm", vmUUID, "--draganddrop", dragDrop); err != nil {
+		if _, _, err := vboxRun(ctx, "modifyvm", vmUUID, "--draganddrop", dragDrop); err != nil {
 			return fmt.Errorf("failed to set drag and drop mode: %w", err)
 		}
 	}
@@ -131,7 +129,7 @@ func applyChipset(ctx context.Context, vmUUID string, chipset string) error {
 	if chipset == "" || chipset == "piix3" {
 		return nil // piix3 is default
 	}
-	_, _, err := vbox.Run(ctx, "modifyvm", vmUUID, "--chipset", chipset)
+	_, _, err := vboxRun(ctx, "modifyvm", vmUUID, "--chipset", chipset)
 	if err != nil {
 		return fmt.Errorf("failed to set chipset to %s: %w", chipset, err)
 	}
@@ -152,7 +150,7 @@ func applySerialPorts(ctx context.Context, vmUUID string, d *schema.ResourceData
 		irq := []string{"4", "3", "4", "3"}
 		if slot >= 0 && slot < 4 {
 			uartFlag := fmt.Sprintf("--uart%d", slot+1)
-			if _, _, err := vbox.Run(ctx, "modifyvm", vmUUID, uartFlag, ioBase[slot], irq[slot]); err != nil {
+			if _, _, err := vboxRun(ctx, "modifyvm", vmUUID, uartFlag, ioBase[slot], irq[slot]); err != nil {
 				return fmt.Errorf("failed to enable UART slot %d: %w", slot, err)
 			}
 
@@ -161,7 +159,7 @@ func applySerialPorts(ctx context.Context, vmUUID string, d *schema.ResourceData
 			if path != "" {
 				args = append(args, path)
 			}
-			if _, _, err := vbox.Run(ctx, args...); err != nil {
+			if _, _, err := vboxRun(ctx, args...); err != nil {
 				return fmt.Errorf("failed to set serial port %d mode: %w", slot, err)
 			}
 		}

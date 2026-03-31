@@ -5,16 +5,11 @@ import (
 	"sync"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 var (
 	defaultBootOrder = []string{"disk", "none", "none", "none"}
 )
-
-func init() {
-	vbox.Verbose = true
-}
 
 var imageOpMutex sync.Mutex
 

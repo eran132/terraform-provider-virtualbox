@@ -10,7 +10,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/terra-farm/go-virtualbox"
 )
 
 func init() {
@@ -41,5 +40,5 @@ func New() *schema.Provider {
 // configure creates a new instance of the new virtualbox manager which will be
 // used for communication with virtualbox.
 func configure(context.Context, *schema.ResourceData) (any, diag.Diagnostics) {
-	return virtualbox.NewManager(), nil
+	return nil, nil
 }

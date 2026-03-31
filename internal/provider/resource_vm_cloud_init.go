@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 // applyUserData sets cloud-init user data via VirtualBox guest properties.
@@ -22,13 +21,13 @@ func applyUserData(ctx context.Context, vmUUID string, userData string) error {
 	})
 
 	// Set user-data via guest property (cloud-init GuestInfo datasource)
-	if _, _, err := vbox.Run(ctx, "guestproperty", "set", vmUUID,
+	if _, _, err := vboxRun(ctx, "guestproperty", "set", vmUUID,
 		"/VirtualBox/GuestInfo/userdata", userData); err != nil {
 		return fmt.Errorf("failed to set user data guest property: %w", err)
 	}
 
 	// Also set via extradata for cloud-init OVF datasource compatibility
-	if _, _, err := vbox.Run(ctx, "setextradata", vmUUID,
+	if _, _, err := vboxRun(ctx, "setextradata", vmUUID,
 		"VBoxInternal/Devices/VMMDev/0/Config/GetHostTimeDisabled", "1"); err != nil {
 		// Non-fatal, just log
 		tflog.Warn(ctx, "failed to set extra data", map[string]any{"error": err.Error()})

@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 func dataSourceHostInfo() *schema.Resource {
@@ -64,7 +63,7 @@ func dataSourceHostInfoRead(ctx context.Context, d *schema.ResourceData, meta an
 	tflog.Debug(ctx, "reading VirtualBox host info")
 
 	// Get VirtualBox version
-	versionOut, _, err := vbox.Run(ctx, "--version")
+	versionOut, _, err := vboxRun(ctx, "--version")
 	if err != nil {
 		return diag.Errorf("failed to get VirtualBox version: %v", err)
 	}
@@ -74,7 +73,7 @@ func dataSourceHostInfoRead(ctx context.Context, d *schema.ResourceData, meta an
 	}
 
 	// Get host-only interfaces
-	hostOnlyOut, _, err := vbox.Run(ctx, "list", "hostonlyifs")
+	hostOnlyOut, _, err := vboxRun(ctx, "list", "hostonlyifs")
 	if err != nil {
 		// Not an error if there are simply no host-only interfaces
 		tflog.Warn(ctx, "failed to list host-only interfaces", map[string]any{
@@ -88,7 +87,7 @@ func dataSourceHostInfoRead(ctx context.Context, d *schema.ResourceData, meta an
 	}
 
 	// Get bridged interfaces
-	bridgedOut, _, err := vbox.Run(ctx, "list", "bridgedifs")
+	bridgedOut, _, err := vboxRun(ctx, "list", "bridgedifs")
 	if err != nil {
 		tflog.Warn(ctx, "failed to list bridged interfaces", map[string]any{
 			"error": err.Error(),

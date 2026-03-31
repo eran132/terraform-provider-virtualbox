@@ -9,41 +9,40 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
-func netTfToVbox(ctx context.Context, d *schema.ResourceData) ([]vbox.NIC, error) {
-	tfToVboxNetworkType := func(attr string) (vbox.NICNetwork, error) {
+func netTfToVbox(ctx context.Context, d *schema.ResourceData) ([]NIC, error) {
+	tfToVboxNetworkType := func(attr string) (NICNetwork, error) {
 		switch attr {
 		case "bridged":
-			return vbox.NICNetBridged, nil
+			return NICNetBridged, nil
 		case "nat":
-			return vbox.NICNetNAT, nil
+			return NICNetNAT, nil
 		case "hostonly":
-			return vbox.NICNetHostonly, nil
+			return NICNetHostonly, nil
 		case "internal":
-			return vbox.NICNetInternal, nil
+			return NICNetInternal, nil
 		case "generic":
-			return vbox.NICNetGeneric, nil
+			return NICNetGeneric, nil
 		default:
 			return "", fmt.Errorf("invalid virtual network adapter type: %s", attr)
 		}
 	}
 
-	tfToVboxNetDevice := func(attr string) (vbox.NICHardware, error) {
+	tfToVboxNetDevice := func(attr string) (NICHardware, error) {
 		switch attr {
 		case "PCIII":
-			return vbox.AMDPCNetPCIII, nil
+			return AMDPCNetPCIII, nil
 		case "FASTIII":
-			return vbox.AMDPCNetFASTIII, nil
+			return AMDPCNetFASTIII, nil
 		case "IntelPro1000MTDesktop":
-			return vbox.IntelPro1000MTDesktop, nil
+			return IntelPro1000MTDesktop, nil
 		case "IntelPro1000TServer":
-			return vbox.IntelPro1000TServer, nil
+			return IntelPro1000TServer, nil
 		case "IntelPro1000MTServer":
-			return vbox.IntelPro1000MTServer, nil
+			return IntelPro1000MTServer, nil
 		case "VirtIO":
-			return vbox.VirtIO, nil
+			return VirtIO, nil
 		default:
 			return "", fmt.Errorf("invalid virtual network device: %s", attr)
 		}
@@ -52,11 +51,11 @@ func netTfToVbox(ctx context.Context, d *schema.ResourceData) ([]vbox.NIC, error
 	var err error
 	var errs []error
 	nicCount := d.Get("network_adapter.#").(int)
-	adapters := make([]vbox.NIC, 0, nicCount)
+	adapters := make([]NIC, 0, nicCount)
 
 	for i := 0; i < nicCount; i++ {
 		prefix := fmt.Sprintf("network_adapter.%d.", i)
-		var adapter vbox.NIC
+		var adapter NIC
 
 		if attr, ok := d.Get(prefix + "type").(string); ok && attr != "" {
 			adapter.Network, err = tfToVboxNetworkType(attr)
@@ -65,7 +64,7 @@ func netTfToVbox(ctx context.Context, d *schema.ResourceData) ([]vbox.NIC, error
 			adapter.Hardware, err = tfToVboxNetDevice(attr)
 		}
 		/* 'Hostonly' and 'bridged' network need property 'host_interface' been set */
-		if adapter.Network == vbox.NICNetHostonly || adapter.Network == vbox.NICNetBridged {
+		if adapter.Network == NICNetHostonly || adapter.Network == NICNetBridged {
 			var ok bool
 			adapter.HostInterface, ok = d.Get(prefix + "host_interface").(string)
 			if !ok || adapter.HostInterface == "" {
@@ -92,8 +91,8 @@ func netTfToVbox(ctx context.Context, d *schema.ResourceData) ([]vbox.NIC, error
 }
 
 // countRuntimeNics will return the number of NICs found after VM successfully started.
-func countRuntimeNICs(vm *vbox.Machine) (int, error) {
-	count, err := vbox.GetGuestProperty(vm.UUID, "/VirtualBox/GuestInfo/Net/Count")
+func countRuntimeNICs(vm *Machine) (int, error) {
+	count, err := getGuestProperty(vm.UUID, "/VirtualBox/GuestInfo/Net/Count")
 
 	if err != nil {
 		return 0, err
@@ -120,7 +119,7 @@ func applyNICSettings(ctx context.Context, vmUUID string, d *schema.ResourceData
 		if promisc, ok := d.GetOk(prefix + "promiscuous_mode"); ok {
 			mode := promisc.(string)
 			if mode != "deny" {
-				if _, _, err := vbox.Run(ctx, "modifyvm", vmUUID,
+				if _, _, err := vboxRun(ctx, "modifyvm", vmUUID,
 					fmt.Sprintf("--nicpromisc%d", nicIdx), mode); err != nil {
 					return fmt.Errorf("failed to set promiscuous mode on NIC %d: %w", i, err)
 				}
@@ -133,7 +132,7 @@ func applyNICSettings(ctx context.Context, vmUUID string, d *schema.ResourceData
 			if !cable.(bool) {
 				val = "off"
 			}
-			if _, _, err := vbox.Run(ctx, "modifyvm", vmUUID,
+			if _, _, err := vboxRun(ctx, "modifyvm", vmUUID,
 				fmt.Sprintf("--cableconnected%d", nicIdx), val); err != nil {
 				return fmt.Errorf("failed to set cable connected on NIC %d: %w", i, err)
 			}
@@ -141,7 +140,7 @@ func applyNICSettings(ctx context.Context, vmUUID string, d *schema.ResourceData
 
 		// MAC address (if user specified)
 		if mac, ok := d.GetOk(prefix + "mac_address"); ok && mac.(string) != "" {
-			if _, _, err := vbox.Run(ctx, "modifyvm", vmUUID,
+			if _, _, err := vboxRun(ctx, "modifyvm", vmUUID,
 				fmt.Sprintf("--macaddress%d", nicIdx), mac.(string)); err != nil {
 				return fmt.Errorf("failed to set MAC address on NIC %d: %w", i, err)
 			}
@@ -152,7 +151,7 @@ func applyNICSettings(ctx context.Context, vmUUID string, d *schema.ResourceData
 		if nicType == "nat" {
 			// NAT DNS host resolver
 			if dnsResolver, ok := d.GetOk(prefix + "nat_dns_host_resolver"); ok && dnsResolver.(bool) {
-				if _, _, err := vbox.Run(ctx, "modifyvm", vmUUID,
+				if _, _, err := vboxRun(ctx, "modifyvm", vmUUID,
 					fmt.Sprintf("--natdnshostresolver%d", nicIdx), "on"); err != nil {
 					return fmt.Errorf("failed to set NAT DNS host resolver on NIC %d: %w", i, err)
 				}
@@ -160,7 +159,7 @@ func applyNICSettings(ctx context.Context, vmUUID string, d *schema.ResourceData
 
 			// NAT DNS proxy
 			if dnsProxy, ok := d.GetOk(prefix + "nat_dns_proxy"); ok && dnsProxy.(bool) {
-				if _, _, err := vbox.Run(ctx, "modifyvm", vmUUID,
+				if _, _, err := vboxRun(ctx, "modifyvm", vmUUID,
 					fmt.Sprintf("--natdnsproxy%d", nicIdx), "on"); err != nil {
 					return fmt.Errorf("failed to set NAT DNS proxy on NIC %d: %w", i, err)
 				}
@@ -168,7 +167,7 @@ func applyNICSettings(ctx context.Context, vmUUID string, d *schema.ResourceData
 
 			// Port forwarding rules - first delete all existing, then add new
 			// Delete existing rules (ignore errors as there may be none)
-			vbox.Run(ctx, "modifyvm", vmUUID, fmt.Sprintf("--natpf%d", nicIdx), "delete", "all") //nolint:errcheck
+			vboxRun(ctx, "modifyvm", vmUUID, fmt.Sprintf("--natpf%d", nicIdx), "delete", "all") //nolint:errcheck
 
 			pfCount := d.Get(fmt.Sprintf("network_adapter.%d.port_forwarding.#", i)).(int)
 			for j := 0; j < pfCount; j++ {
@@ -183,7 +182,7 @@ func applyNICSettings(ctx context.Context, vmUUID string, d *schema.ResourceData
 				rule := fmt.Sprintf("%s,%s,%s,%d,%s,%d",
 					ruleName, protocol, hostIP, hostPort, guestIP, guestPort)
 
-				if _, _, err := vbox.Run(ctx, "modifyvm", vmUUID,
+				if _, _, err := vboxRun(ctx, "modifyvm", vmUUID,
 					fmt.Sprintf("--natpf%d", nicIdx), rule); err != nil {
 					return fmt.Errorf("failed to add port forwarding rule %q on NIC %d: %w", ruleName, i, err)
 				}
@@ -194,37 +193,37 @@ func applyNICSettings(ctx context.Context, vmUUID string, d *schema.ResourceData
 	return nil
 }
 
-func netVboxToTf(vm *vbox.Machine, d *schema.ResourceData) error {
-	vboxToTfNetworkType := func(netType vbox.NICNetwork) string {
+func netVboxToTf(vm *Machine, d *schema.ResourceData) error {
+	vboxToTfNetworkType := func(netType NICNetwork) string {
 		switch netType {
-		case vbox.NICNetBridged:
+		case NICNetBridged:
 			return "bridged"
-		case vbox.NICNetNAT:
+		case NICNetNAT:
 			return "nat"
-		case vbox.NICNetHostonly:
+		case NICNetHostonly:
 			return "hostonly"
-		case vbox.NICNetInternal:
+		case NICNetInternal:
 			return "internal"
-		case vbox.NICNetGeneric:
+		case NICNetGeneric:
 			return "generic"
 		default:
 			return ""
 		}
 	}
 
-	vboxToTfVdevice := func(vdevice vbox.NICHardware) string {
+	vboxToTfVdevice := func(vdevice NICHardware) string {
 		switch vdevice {
-		case vbox.AMDPCNetPCIII:
+		case AMDPCNetPCIII:
 			return "PCIII"
-		case vbox.AMDPCNetFASTIII:
+		case AMDPCNetFASTIII:
 			return "FASTIII"
-		case vbox.IntelPro1000MTDesktop:
+		case IntelPro1000MTDesktop:
 			return "IntelPro1000MTDesktop"
-		case vbox.IntelPro1000TServer:
+		case IntelPro1000TServer:
 			return "IntelPro1000TServer"
-		case vbox.IntelPro1000MTServer:
+		case IntelPro1000MTServer:
 			return "IntelPro1000MTServer"
-		case vbox.VirtIO:
+		case VirtIO:
 			return "VirtIO"
 		default:
 			return ""
@@ -232,7 +231,7 @@ func netVboxToTf(vm *vbox.Machine, d *schema.ResourceData) error {
 	}
 
 	/* Collect NIC data from guest OS, available only when VM is running */
-	if vm.State == vbox.Running {
+	if vm.State == MachineStateRunning {
 		nicCount, err := countRuntimeNICs(vm)
 		if err != nil {
 			// Guest Additions not installed or not ready — skip guest property collection
@@ -277,7 +276,7 @@ func netVboxToTf(vm *vbox.Machine, d *schema.ResourceData) error {
 			var osNic OsNicData
 
 			/* NIC MAC address */
-			macAddr, err := vbox.GetGuestProperty(vm.UUID, fmt.Sprintf("/VirtualBox/GuestInfo/Net/%d/MAC", i))
+			macAddr, err := getGuestProperty(vm.UUID, fmt.Sprintf("/VirtualBox/GuestInfo/Net/%d/MAC", i))
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -287,7 +286,7 @@ func netVboxToTf(vm *vbox.Machine, d *schema.ResourceData) error {
 			}
 
 			/* NIC status */
-			status, err := vbox.GetGuestProperty(vm.UUID, fmt.Sprintf("/VirtualBox/GuestInfo/Net/%d/Status", i))
+			status, err := getGuestProperty(vm.UUID, fmt.Sprintf("/VirtualBox/GuestInfo/Net/%d/Status", i))
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -298,7 +297,7 @@ func netVboxToTf(vm *vbox.Machine, d *schema.ResourceData) error {
 			osNic.status = strings.ToLower(status)
 
 			/* NIC ipv4 address */
-			ipv4Addr, err := vbox.GetGuestProperty(vm.UUID, fmt.Sprintf("/VirtualBox/GuestInfo/Net/%d/V4/IP", i))
+			ipv4Addr, err := getGuestProperty(vm.UUID, fmt.Sprintf("/VirtualBox/GuestInfo/Net/%d/V4/IP", i))
 			if err != nil {
 				errs = append(errs, err)
 				continue

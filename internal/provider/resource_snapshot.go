@@ -7,7 +7,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 func resourceSnapshot() *schema.Resource {
@@ -69,7 +68,7 @@ func resourceSnapshotCreate(ctx context.Context, d *schema.ResourceData, meta an
 		args = append(args, "--live")
 	}
 
-	_, _, err := vbox.Run(ctx, args...)
+	_, _, err := vboxRun(ctx, args...)
 	if err != nil {
 		return diag.Errorf("failed to take snapshot %q for VM %s: %v", name, vmID, err)
 	}
@@ -147,7 +146,7 @@ func resourceSnapshotUpdate(ctx context.Context, d *schema.ResourceData, meta an
 
 	if d.HasChange("description") {
 		newDescription := d.Get("description").(string)
-		_, _, err := vbox.Run(ctx, "snapshot", vmID, "edit", name, "--description", newDescription)
+		_, _, err := vboxRun(ctx, "snapshot", vmID, "edit", name, "--description", newDescription)
 		if err != nil {
 			return diag.Errorf("failed to update description for snapshot %q on VM %s: %v", name, vmID, err)
 		}
@@ -160,7 +159,7 @@ func resourceSnapshotDelete(ctx context.Context, d *schema.ResourceData, meta an
 	vmID := d.Get("vm_id").(string)
 	snapshotUUID := d.Id()
 
-	_, _, err := vbox.Run(ctx, "snapshot", vmID, "delete", snapshotUUID)
+	_, _, err := vboxRun(ctx, "snapshot", vmID, "delete", snapshotUUID)
 	if err != nil {
 		return diag.Errorf("failed to delete snapshot %s on VM %s: %v", snapshotUUID, vmID, err)
 	}
@@ -190,7 +189,7 @@ type snapshotInfo struct {
 //
 // The first snapshot has no suffix; subsequent snapshots use -1, -2, etc.
 func listSnapshots(ctx context.Context, vmID string) ([]snapshotInfo, error) {
-	stdout, _, err := vbox.Run(ctx, "snapshot", vmID, "list", "--machinereadable")
+	stdout, _, err := vboxRun(ctx, "snapshot", vmID, "list", "--machinereadable")
 	if err != nil {
 		// VBoxManage returns an error when there are no snapshots
 		if strings.Contains(stdout, "does not have any snapshots") {

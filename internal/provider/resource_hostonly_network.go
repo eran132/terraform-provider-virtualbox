@@ -9,7 +9,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 func resourceHostonlyNetwork() *schema.Resource {
@@ -72,7 +71,7 @@ func resourceHostonlyNetwork() *schema.Resource {
 
 func resourceHostonlyNetworkCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	// Create the host-only interface
-	stdout, _, err := vbox.Run(ctx, "hostonlyif", "create")
+	stdout, _, err := vboxRun(ctx, "hostonlyif", "create")
 	if err != nil {
 		return diag.Errorf("failed to create host-only interface: %v", err)
 	}
@@ -87,7 +86,7 @@ func resourceHostonlyNetworkCreate(ctx context.Context, d *schema.ResourceData, 
 	ipv4Address := d.Get("ipv4_address").(string)
 	ipv4Netmask := d.Get("ipv4_netmask").(string)
 
-	_, _, err = vbox.Run(ctx, "hostonlyif", "ipconfig", name, "--ip", ipv4Address, "--netmask", ipv4Netmask)
+	_, _, err = vboxRun(ctx, "hostonlyif", "ipconfig", name, "--ip", ipv4Address, "--netmask", ipv4Netmask)
 	if err != nil {
 		return diag.Errorf("failed to configure IPv4 on %s: %v", name, err)
 	}
@@ -97,7 +96,7 @@ func resourceHostonlyNetworkCreate(ctx context.Context, d *schema.ResourceData, 
 		ipv6Address := v.(string)
 		ipv6Prefix := strconv.Itoa(d.Get("ipv6_prefix").(int))
 
-		_, _, err = vbox.Run(ctx, "hostonlyif", "ipconfig", name, "--ipv6", ipv6Address, "--ipv6prefix", ipv6Prefix)
+		_, _, err = vboxRun(ctx, "hostonlyif", "ipconfig", name, "--ipv6", ipv6Address, "--ipv6prefix", ipv6Prefix)
 		if err != nil {
 			return diag.Errorf("failed to configure IPv6 on %s: %v", name, err)
 		}
@@ -122,7 +121,7 @@ func resourceHostonlyNetworkCreate(ctx context.Context, d *schema.ResourceData, 
 func resourceHostonlyNetworkRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	name := d.Id()
 
-	stdout, _, err := vbox.Run(ctx, "list", "hostonlyifs")
+	stdout, _, err := vboxRun(ctx, "list", "hostonlyifs")
 	if err != nil {
 		return diag.Errorf("failed to list host-only interfaces: %v", err)
 	}
@@ -175,7 +174,7 @@ func resourceHostonlyNetworkUpdate(ctx context.Context, d *schema.ResourceData, 
 		ipv4Address := d.Get("ipv4_address").(string)
 		ipv4Netmask := d.Get("ipv4_netmask").(string)
 
-		_, _, err := vbox.Run(ctx, "hostonlyif", "ipconfig", name, "--ip", ipv4Address, "--netmask", ipv4Netmask)
+		_, _, err := vboxRun(ctx, "hostonlyif", "ipconfig", name, "--ip", ipv4Address, "--netmask", ipv4Netmask)
 		if err != nil {
 			return diag.Errorf("failed to update IPv4 on %s: %v", name, err)
 		}
@@ -187,7 +186,7 @@ func resourceHostonlyNetworkUpdate(ctx context.Context, d *schema.ResourceData, 
 			ipv6Address := v.(string)
 			ipv6Prefix := strconv.Itoa(d.Get("ipv6_prefix").(int))
 
-			_, _, err := vbox.Run(ctx, "hostonlyif", "ipconfig", name, "--ipv6", ipv6Address, "--ipv6prefix", ipv6Prefix)
+			_, _, err := vboxRun(ctx, "hostonlyif", "ipconfig", name, "--ipv6", ipv6Address, "--ipv6prefix", ipv6Prefix)
 			if err != nil {
 				return diag.Errorf("failed to update IPv6 on %s: %v", name, err)
 			}
@@ -202,7 +201,7 @@ func resourceHostonlyNetworkUpdate(ctx context.Context, d *schema.ResourceData, 
 
 		if !dhcpEnabled && wasDHCPEnabled {
 			// Remove DHCP server
-			_, _, err := vbox.Run(ctx, "dhcpserver", "remove", "--ifname", name)
+			_, _, err := vboxRun(ctx, "dhcpserver", "remove", "--ifname", name)
 			if err != nil {
 				return diag.Errorf("failed to remove DHCP server for %s: %v", name, err)
 			}
@@ -227,14 +226,14 @@ func resourceHostonlyNetworkDelete(ctx context.Context, d *schema.ResourceData, 
 
 	// Remove DHCP server first if enabled
 	if d.Get("dhcp_enabled").(bool) {
-		_, _, err := vbox.Run(ctx, "dhcpserver", "remove", "--ifname", name)
+		_, _, err := vboxRun(ctx, "dhcpserver", "remove", "--ifname", name)
 		if err != nil {
 			return diag.Errorf("failed to remove DHCP server for %s: %v", name, err)
 		}
 	}
 
 	// Remove the host-only interface
-	_, _, err := vbox.Run(ctx, "hostonlyif", "remove", name)
+	_, _, err := vboxRun(ctx, "hostonlyif", "remove", name)
 	if err != nil {
 		return diag.Errorf("failed to remove host-only interface %s: %v", name, err)
 	}
@@ -319,7 +318,7 @@ func addDHCPServer(ctx context.Context, d *schema.ResourceData, name string) dia
 		return diag.Errorf("dhcp_lower_ip and dhcp_upper_ip are required when dhcp_enabled is true")
 	}
 
-	_, _, err := vbox.Run(ctx, "dhcpserver", "add",
+	_, _, err := vboxRun(ctx, "dhcpserver", "add",
 		"--ifname", name,
 		"--ip", ipv4Address,
 		"--netmask", ipv4Netmask,
@@ -345,7 +344,7 @@ func modifyDHCPServer(ctx context.Context, d *schema.ResourceData, name string) 
 		return diag.Errorf("dhcp_lower_ip and dhcp_upper_ip are required when dhcp_enabled is true")
 	}
 
-	_, _, err := vbox.Run(ctx, "dhcpserver", "modify",
+	_, _, err := vboxRun(ctx, "dhcpserver", "modify",
 		"--ifname", name,
 		"--ip", ipv4Address,
 		"--netmask", ipv4Netmask,

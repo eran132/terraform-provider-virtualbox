@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	vbox "github.com/terra-farm/go-virtualbox"
 )
 
 func dataSourceVM() *schema.Resource {
@@ -77,7 +76,7 @@ func dataSourceVMRead(ctx context.Context, d *schema.ResourceData, meta any) dia
 		"identifier": identifier,
 	})
 
-	out, _, err := vbox.Run(ctx, "showvminfo", identifier, "--machinereadable")
+	out, _, err := vboxRun(ctx, "showvminfo", identifier, "--machinereadable")
 	if err != nil {
 		return diag.Errorf("failed to get VM info for %q: %v", identifier, err)
 	}
