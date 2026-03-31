@@ -167,6 +167,10 @@ func fetchIfRemote(u *url.URL) (string, error) {
 
 	_, file := filepath.Split(u.Path)
 
+	// Make the download path absolute so tar can find it regardless of CWD
+	absFile, _ := filepath.Abs(file)
+	file = absFile
+
 	// if the file is not found, and the error is unexpected, return
 	if _, err := os.Stat(file); err != nil && !os.IsNotExist(err) {
 		return "", err

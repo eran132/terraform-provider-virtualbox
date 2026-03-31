@@ -57,11 +57,16 @@ func unpackImage(ctx context.Context, imagePath, toDir string) error {
 
 	// Try tar with auto-detect compression first (works on most systems)
 	// Use -a flag for auto-detection, fall back to explicit flags
+	// Convert Windows paths to POSIX format for tar compatibility
+	// C:\Users\... -> /c/Users/... (required by Git Bash's tar on Windows)
+	tarImage := toTarPath(imagePath)
+	tarDir := toTarPath(toDir)
+
 	for _, tarArgs := range [][]string{
-		{"tar", "-xvf", imagePath, "-C", toDir},  // auto-detect
-		{"tar", "-xzvf", imagePath, "-C", toDir},  // gzip
-		{"tar", "-xjvf", imagePath, "-C", toDir},  // bzip2
-		{"tar", "-xJvf", imagePath, "-C", toDir},  // xz
+		{"tar", "-xvf", tarImage, "-C", tarDir},  // auto-detect
+		{"tar", "-xzvf", tarImage, "-C", tarDir},  // gzip
+		{"tar", "-xjvf", tarImage, "-C", tarDir},  // bzip2
+		{"tar", "-xJvf", tarImage, "-C", tarDir},  // xz
 	} {
 		cmd := exec.Command(tarArgs[0], tarArgs[1:]...)
 		cmd.Stdout = os.Stdout
@@ -76,6 +81,18 @@ func unpackImage(ctx context.Context, imagePath, toDir string) error {
 	}
 
 	return fmt.Errorf("error unpacking gold image %s: all tar extraction methods failed", imagePath)
+}
+
+// toTarPath converts a Windows path to a POSIX path for tar.
+// C:\Users\... -> /c/Users/... (Git Bash tar can't handle C: drive letters)
+func toTarPath(p string) string {
+	p = strings.ReplaceAll(p, "\\", "/")
+	if len(p) >= 2 && p[1] == ':' {
+		// C:/... -> /c/...
+		drive := strings.ToLower(string(p[0]))
+		p = "/" + drive + p[2:]
+	}
+	return p
 }
 
 func gatherDisks(path string) ([]string, error) {
