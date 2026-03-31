@@ -1,7 +1,7 @@
-# CLAUDE.md - terraform-provider-virtualbox
+# CLAUDE.md - terraform-provider-vbox
 
 ## Project Overview
-Terraform provider for Oracle VirtualBox. Forked from `terra-farm/terraform-provider-virtualbox` to `eran132/terraform-provider-virtualbox`. Production-grade provider with Vagrant-level feature parity.
+Terraform provider for Oracle VirtualBox. Published as `eran132/vbox` on the Terraform Registry. Forked from `terra-farm/terraform-provider-virtualbox`. Production-grade provider with Vagrant-level feature parity.
 
 ## Build & Test Commands
 ```bash
@@ -44,7 +44,9 @@ make testacc       # Acceptance tests (requires TF_ACC=1 and VirtualBox)
 - **Storage**: storage_controller, disk_attachment, optical_disks
 - **Sharing**: shared_folder (host_path, auto_mount, mount_point)
 - **Devices**: usb_controller, serial_port, clipboard_mode, drag_and_drop
+- **Provisioning**: user_data (cloud-init via guest properties)
 - **Advanced**: customize (arbitrary VBoxManage commands), linked_clone, source_vm
+- **Import**: all 5 resources support `terraform import`
 
 ## File Structure
 ```
@@ -59,6 +61,7 @@ internal/
     resource_vm_helpers.go   # tfToVbox, waitForVM, fetchRemote
     resource_vm_customize.go # Customize, firmware, USB, serial, chipset
     resource_vm_shared_folders.go # Shared folders, CPU cap, nested HW
+    resource_vm_cloud_init.go # Cloud-init user_data
     resource_vm_test.go      # Acceptance tests
     resource_disk.go         # Disk resource
     resource_snapshot.go     # Snapshot resource
