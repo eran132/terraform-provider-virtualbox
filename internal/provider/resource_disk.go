@@ -17,6 +17,9 @@ func resourceDisk() *schema.Resource {
 		ReadContext:   resourceDiskRead,
 		UpdateContext: resourceDiskUpdate,
 		DeleteContext: resourceDiskDelete,
+		Importer: &schema.ResourceImporter{
+			StateContext: resourceDiskImport,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"file_path": {
@@ -165,6 +168,27 @@ func resourceDiskDelete(ctx context.Context, d *schema.ResourceData, meta any) d
 	d.SetId("")
 
 	return nil
+}
+
+// resourceDiskImport imports a disk by file path.
+// Usage: terraform import virtualbox_disk.example /path/to/disk.vdi
+func resourceDiskImport(ctx context.Context, d *schema.ResourceData, meta any) ([]*schema.ResourceData, error) {
+	filePath := d.Id()
+
+	// Set file_path from the import ID
+	if err := d.Set("file_path", filePath); err != nil {
+		return nil, err
+	}
+
+	// Read disk info to get the UUID
+	info, err := showMediumInfo(ctx, filePath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot import disk %s: %w", filePath, err)
+	}
+
+	d.SetId(info.uuid)
+
+	return []*schema.ResourceData{d}, nil
 }
 
 // diskMediumInfo holds parsed output from VBoxManage showmediuminfo for a disk.

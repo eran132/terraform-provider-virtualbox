@@ -16,6 +16,9 @@ func resourceSnapshot() *schema.Resource {
 		ReadContext:   resourceSnapshotRead,
 		UpdateContext: resourceSnapshotUpdate,
 		DeleteContext: resourceSnapshotDelete,
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"vm_id": {

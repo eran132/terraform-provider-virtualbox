@@ -18,6 +18,9 @@ func resourceHostonlyNetwork() *schema.Resource {
 		ReadContext:   resourceHostonlyNetworkRead,
 		UpdateContext: resourceHostonlyNetworkUpdate,
 		DeleteContext: resourceHostonlyNetworkDelete,
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"name": {

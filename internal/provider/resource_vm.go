@@ -25,6 +25,9 @@ func resourceVM() *schema.Resource {
 		ReadContext:   resourceVMRead,
 		UpdateContext: resourceVMUpdate,
 		Delete:        resourceVMDelete,
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 
