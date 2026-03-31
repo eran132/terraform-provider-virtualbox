@@ -20,7 +20,7 @@ The VirtualBox provider allows Terraform to manage [Oracle VirtualBox](https://w
 terraform {
   required_providers {
     virtualbox = {
-      source  = "eran132/virtualbox"
+      source  = "eran132/vbox"
       version = "~> 0.3.0"
     }
   }

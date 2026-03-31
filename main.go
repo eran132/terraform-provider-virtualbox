@@ -48,7 +48,7 @@ func main() {
 	}
 
 	err = tf5server.Serve(
-		"registry.terraform.io/eran132/virtualbox",
+		"registry.terraform.io/eran132/vbox",
 		muxServer.ProviderServer,
 		serveOpts...,
 	)

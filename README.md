@@ -16,7 +16,7 @@ Published documentation is located on the [Terraform Registry](https://registry.
 terraform {
   required_providers {
     virtualbox = {
-      source  = "eran132/virtualbox"
+      source  = "eran132/vbox"
       version = "~> 1.0"
     }
   }

@@ -1,0 +1,6 @@
+provider_installation {
+  dev_overrides {
+    "eran132/virtualbox" = "C:/Users/eranmar/go/bin"
+  }
+  direct {}
+}

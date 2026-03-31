@@ -18,7 +18,7 @@ make testacc       # Acceptance tests (requires TF_ACC=1 and VirtualBox)
 - **Language**: Go 1.25+
 - **Frameworks**: Terraform Plugin SDK v2 + Plugin Framework v1.19 (via terraform-plugin-mux)
 - **VBoxManage interaction**: Custom command layer (`internal/vboxmanage/`) + `terra-farm/go-virtualbox`
-- **Entry point**: `main.go` — mux server at `registry.terraform.io/eran132/virtualbox`
+- **Entry point**: `main.go` — mux server at `registry.terraform.io/eran132/vbox`
 - **Provider code**: `internal/provider/` (15+ Go files)
 - **VBoxManage wrappers**: `internal/vboxmanage/` (13 Go files)
 
@@ -80,7 +80,7 @@ internal/
 ## CI/CD
 - GitHub Actions: lint (golangci-lint v6) + build matrix (Ubuntu/Windows/macOS, Go 1.22/1.23)
 - GoReleaser v6 for cross-platform releases with GPG signing (crazy-max/ghaction-import-gpg@v6)
-- Registry: `eran132/virtualbox`
+- Registry: `eran132/vbox`
 
 ## License
 MIT (original copyright 2016 ccll, 2026 eran132)
